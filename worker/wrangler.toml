@@ -1,0 +1,10 @@
+name = "equity-researcher-proxy"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+# Comma-separated origins allowed to use this proxy, e.g. "https://<you>.github.io".
+# localhost is always allowed for development.
+ALLOWED_ORIGINS = "*"
+# SEC requires a contact in the User-Agent of automated requests.
+SEC_USER_AGENT = "EquityResearcher research@example.com"

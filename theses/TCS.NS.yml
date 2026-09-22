@@ -1,0 +1,31 @@
+# Investment thesis for TCS.NS — evaluated automatically by the daily build.
+written: 2026-09-22
+conviction: medium
+thesis: |
+  TCS is a cash machine with a net-cash balance sheet and very high returns on capital.
+  After a long de-rating the stock trades near the bottom of its own P/E history, so
+  even modest single-digit growth can deliver acceptable returns — provided margins hold
+  against AI-driven pricing pressure.
+
+kpis:
+  - name: Operating margin holds above 24%
+    metric: operatingMargin
+    op: ">="
+    value: 0.24
+  - name: Revenue keeps growing
+    metric: revenueGrowth
+    op: ">"
+    value: 0.03
+  - name: ROE stays above 40%
+    metric: roe
+    op: ">="
+    value: 0.4
+    years: 3
+  - name: Earnings convert to cash
+    metric: cfoToNetIncome
+    op: ">="
+    value: 0.9
+  - name: No serious red flags
+    metric: redFlags
+    op: "<="
+    value: 0

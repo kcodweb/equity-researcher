@@ -1,0 +1,54 @@
+# Equity Researcher configuration
+# The daily GitHub Action researches every ticker in `watchlist`.
+# Indian stocks use Yahoo suffixes: .NS (NSE) or .BO (BSE).
+
+watchlist:
+  - symbol: AAPL
+    peers: [MSFT, GOOGL, DELL, HPQ, SONY]
+  - symbol: MSFT
+    peers: [GOOGL, AMZN, ORCL, CRM, ADBE]
+  - symbol: NVDA
+    peers: [AMD, AVGO, INTC, QCOM, TSM]
+  - symbol: JPM
+    peers: [BAC, WFC, C, GS, MS]
+  - symbol: RELIANCE.NS
+    peers: [ONGC.NS, IOC.NS, BPCL.NS, BHARTIARTL.NS]
+  - symbol: TCS.NS
+    peers: [INFY.NS, HCLTECH.NS, WIPRO.NS, TECHM.NS]
+  - symbol: HDFCBANK.NS
+    peers: [ICICIBANK.NS, KOTAKBANK.NS, AXISBANK.NS, SBIN.NS]
+  - symbol: ASIANPAINT.NS
+    peers: [BERGEPAINT.NS, KANSAINER.NS, PIDILITIND.NS]
+
+# Public URL of your Cloudflare Worker (see worker/README section in README.md).
+# Enables live lookup of any ticker from the site. Leave empty until deployed.
+workerUrl: ""
+
+# SEC asks every automated client to identify itself with a contact email.
+# Can be overridden by the SEC_USER_AGENT environment variable / repo secret.
+secUserAgent: "EquityResearcher research@example.com"
+
+# Valuation defaults per market (editable live in the Valuation Lab).
+markets:
+  US:
+    benchmark: "^GSPC"
+    benchmarkName: "S&P 500"
+    riskFree: 0.042        # replaced by the live 10Y Treasury yield when available
+    equityRiskPremium: 0.045
+    terminalGrowth: 0.025
+    taxRate: 0.21
+  IN:
+    benchmark: "^NSEI"
+    benchmarkName: "Nifty 50"
+    riskFree: 0.064
+    equityRiskPremium: 0.07
+    terminalGrowth: 0.05
+    taxRate: 0.25
+
+# AI research notes (Gemini). Key comes from the GEMINI_API_KEY secret.
+ai:
+  enabled: true
+  model: gemini-3.8-flash
+  fallbackModel: gemini-3.5-flash-lite
+  refreshDays: 30          # regenerate a note at most this often unless new results arrive
+  googleSearch: true       # ground notes with Google Search (falls back automatically if unavailable)

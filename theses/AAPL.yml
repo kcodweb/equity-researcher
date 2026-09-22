@@ -1,0 +1,32 @@
+# Investment thesis for AAPL — evaluated automatically by the daily build.
+# metric names: see "Thesis" tab in the site (or core/analysis/thesis.js).
+# op: > >= < <=      years: N  => must hold in each of the last N years
+written: 2026-09-22
+conviction: medium
+thesis: |
+  Apple is a services-led compounder: the installed base keeps growing, services
+  lift gross margin, and heavy buybacks shrink the share count, so EPS grows faster
+  than revenue. The risk is paying too much — the price already assumes strong growth.
+
+kpis:
+  - name: Gross margin keeps expanding with services mix
+    metric: grossMargin
+    op: ">="
+    value: 0.44
+  - name: Cash conversion stays high
+    metric: cfoToNetIncome
+    op: ">="
+    value: 0.9
+    years: 3
+  - name: Returns on capital stay exceptional
+    metric: roic
+    op: ">="
+    value: 0.4
+  - name: Buybacks keep shrinking the share count
+    metric: shareCountChange
+    op: "<="
+    value: -0.01
+  - name: Price does not assume heroic growth
+    metric: impliedGrowth
+    op: "<="
+    value: 0.15
