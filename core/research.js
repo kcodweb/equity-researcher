@@ -158,6 +158,19 @@ export async function researchTicker(symbol, { yahoo, sec = null, markets = DEFA
     nextEarnings: raw(s.calendarEvents?.earnings?.earningsDate?.[0]),
   };
 
+  // Yahoo's TTM amounts are in the reporting currency, and its EV-based ratios mix
+  // currencies when that differs from the trading currency. Convert and recompute.
+  if (isNum(fx)) {
+    for (const k of ['revenue', 'ebitda', 'fcf', 'cfo', 'cash', 'debt']) if (isNum(quote.ttm[k])) quote.ttm[k] *= fx;
+    if (isNum(quote.marketCap)) {
+      quote.enterpriseValue = quote.marketCap + (quote.ttm.debt || 0) - (quote.ttm.cash || 0);
+      quote.evToEbitda = quote.ttm.ebitda > 0 ? quote.enterpriseValue / quote.ttm.ebitda : null;
+      quote.evToRevenue = quote.ttm.revenue > 0 ? quote.enterpriseValue / quote.ttm.revenue : null;
+      quote.priceToSales = quote.ttm.revenue > 0 ? quote.marketCap / quote.ttm.revenue : null;
+    }
+  }
+  sanitizeMultiples(quote);
+
   const holders = {
     insidersPct: raw(s.majorHoldersBreakdown?.insidersPercentHeld),
     institutionsPct: raw(s.majorHoldersBreakdown?.institutionsPercentHeld),
@@ -193,12 +206,17 @@ export async function researchTicker(symbol, { yahoo, sec = null, markets = DEFA
     news = (await soft('news by name', () => yahoo.search(shortName, { quotes: 0, news: 12 }), { news: [] })).news;
   }
 
-  // Peers: configured list, else Yahoo's "similar symbols".
-  let peerSymbols = peerOverride;
-  if (!peerSymbols || !peerSymbols.length) {
-    peerSymbols = (await soft('peer suggestions', () => yahoo.recommendations(symbol), [])).filter((p) => p !== symbol).slice(0, 5);
+  // Peers: configured list, else Yahoo's "similar symbols" — which often mixes
+  // sectors (e.g. TCS -> Reliance, HDFC Bank), so keep same-sector names when possible.
+  let peers;
+  if (peerOverride?.length) {
+    peers = await fetchPeerRows(yahoo, peerOverride, soft);
+  } else {
+    const suggested = (await soft('peer suggestions', () => yahoo.recommendations(symbol), [])).filter((p) => p !== symbol);
+    const rows = await fetchPeerRows(yahoo, suggested.slice(0, 8), soft);
+    const sameSector = rows.filter((r) => r.sector && r.sector === profile.sector);
+    peers = (sameSector.length >= 2 ? sameSector : rows).slice(0, 6);
   }
-  const peers = (await Promise.all(peerSymbols.slice(0, 8).map((p) => soft(`peer ${p}`, () => peerRow(yahoo, p))))).filter(Boolean);
 
   return {
     version: 1,
@@ -345,20 +363,36 @@ function derive(p) {
   p.fy = Number(p.period.slice(0, 4));
 }
 
+export async function fetchPeerRows(yahoo, symbols, soft = async (_, fn) => fn()) {
+  const rows = await Promise.all(symbols.slice(0, 8).map((p) => soft(`peer ${p}`, () => peerRow(yahoo, p.trim().toUpperCase()))));
+  return rows.filter(Boolean);
+}
+
+// Drops multiples that can't be real (Yahoo occasionally returns garbage, e.g. EV/EBITDA > 1,000).
+function sanitizeMultiples(o) {
+  const bounds = { trailingPE: 2000, forwardPE: 2000, evToEbitda: 300, evToRevenue: 200, priceToSales: 200, priceToBook: 500 };
+  for (const [k, max] of Object.entries(bounds)) if (isNum(o[k]) && (o[k] <= 0 || o[k] > max)) o[k] = null;
+  return o;
+}
+
 async function peerRow(yahoo, symbol) {
   const s = await yahoo.quoteSummary(symbol, PEER_MODULES);
-  return {
+  // Sales- and EV-based multiples are unreliable when statements and price use different currencies.
+  const finCur = s.financialData?.financialCurrency;
+  const mixed = finCur && s.price?.currency && finCur !== s.price.currency;
+  return sanitizeMultiples({
     symbol,
     name: s.price?.longName || s.price?.shortName || symbol,
     currency: s.price?.currency,
+    sector: s.assetProfile?.sector || null,
     industry: s.assetProfile?.industry || null,
     price: raw(s.price?.regularMarketPrice),
     marketCap: raw(s.price?.marketCap),
     trailingPE: raw(s.summaryDetail?.trailingPE),
     forwardPE: raw(s.summaryDetail?.forwardPE),
-    priceToBook: raw(s.defaultKeyStatistics?.priceToBook),
-    priceToSales: raw(s.summaryDetail?.priceToSalesTrailing12Months),
-    evToEbitda: raw(s.defaultKeyStatistics?.enterpriseToEbitda),
+    priceToBook: mixed ? null : raw(s.defaultKeyStatistics?.priceToBook),
+    priceToSales: mixed ? null : raw(s.summaryDetail?.priceToSalesTrailing12Months),
+    evToEbitda: mixed ? null : raw(s.defaultKeyStatistics?.enterpriseToEbitda),
     dividendYield: raw(s.summaryDetail?.dividendYield),
     grossMargin: raw(s.financialData?.grossMargins),
     operatingMargin: raw(s.financialData?.operatingMargins),
@@ -369,5 +403,5 @@ async function peerRow(yahoo, symbol) {
     debtToEquity: raw(s.financialData?.debtToEquity),
     return1y: raw(s.defaultKeyStatistics?.['52WeekChange']),
     beta: raw(s.summaryDetail?.beta),
-  };
+  });
 }

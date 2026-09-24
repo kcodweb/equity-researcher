@@ -96,7 +96,12 @@ export function recentFilings(subs, n = 25) {
 }
 
 export function latestAnnualReport(subs) {
-  return recentFilings(subs, 200).find((f) => f.form === '10-K' || f.form === '20-F') || null;
+  return annualReports(subs)[0] || null;
+}
+
+// Every annual report in the recent filings list, newest first.
+export function annualReports(subs) {
+  return recentFilings(subs, 1000).filter((f) => f.form === '10-K' || f.form === '20-F');
 }
 
 // Plain-text extraction without a DOM, so it runs in Node, browsers and workers.
@@ -117,25 +122,35 @@ export function htmlToText(html) {
     .trim();
 }
 
-// Pulls Business, Risk Factors and MD&A out of a 10-K. The table of contents
-// repeats every heading, so for each section the longest candidate wins.
-export function extract10KSections(text, maxChars = 110000) {
-  const sections = [
-    ['Business', /item\s*1\.?\s*business/gi, /item\s*1a\.?\s*risk\s*factors/gi],
-    ['Risk factors', /item\s*1a\.?\s*risk\s*factors/gi, /item\s*(1b|1c|2)\.?\s*(unresolved|cybersecurity|properties)/gi],
-    ["Management's discussion & analysis", /item\s*7\.?\s*management'?s\s*discussion/gi, /item\s*(7a|8)\.?\s*(quantitative|financial\s*statements)/gi],
-  ];
-  const budget = [0.25, 0.35, 0.4];
-  const out = [];
-  sections.forEach(([name, startRe, endRe], i) => {
-    let bestBody = '';
-    for (const m of text.matchAll(startRe)) {
-      endRe.lastIndex = m.index + m[0].length;
-      const e = endRe.exec(text);
+export const TENK_SECTIONS = {
+  business: { title: 'Business', start: /item\s*1\.?\s*business/gi, end: /item\s*1a\.?\s*risk\s*factors/gi },
+  risk: { title: 'Risk factors', start: /item\s*1a\.?\s*risk\s*factors/gi, end: /item\s*(1b|1c|2)\.?\s*(unresolved|cybersecurity|properties)/gi },
+  mdna: { title: "Management's discussion & analysis", start: /item\s*7\.?\s*management'?s\s*discussion/gi, end: /item\s*(7a|8)\.?\s*(quantitative|financial\s*statements)/gi },
+};
+
+// Full text of Business, Risk Factors and MD&A. The table of contents repeats
+// every heading, so for each section the longest candidate wins.
+export function extract10KSectionMap(text) {
+  const out = {};
+  for (const [key, { start, end }] of Object.entries(TENK_SECTIONS)) {
+    let best = '';
+    for (const m of text.matchAll(start)) {
+      end.lastIndex = m.index + m[0].length;
+      const e = end.exec(text);
       const body = text.slice(m.index, e ? e.index : m.index + 200000);
-      if (body.length > bestBody.length) bestBody = body;
+      if (body.length > best.length) best = body;
     }
-    if (bestBody.length > 500) out.push(`## ${name}\n${bestBody.slice(0, Math.floor(maxChars * budget[i]))}`);
-  });
-  return out.join('\n\n');
+    out[key] = best.length > 500 ? best : '';
+  }
+  return out;
+}
+
+// Condensed version for a single prompt: each section trimmed to a share of maxChars.
+export function extract10KSections(text, maxChars = 110000) {
+  const map = extract10KSectionMap(text);
+  const budget = { business: 0.25, risk: 0.35, mdna: 0.4 };
+  return Object.entries(TENK_SECTIONS)
+    .filter(([key]) => map[key])
+    .map(([key, { title }]) => `## ${title}\n${map[key].slice(0, Math.floor(maxChars * budget[key]))}`)
+    .join('\n\n');
 }
