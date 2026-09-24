@@ -1,44 +1,16 @@
 // Daily research build: researches every watchlist ticker and writes static JSON
 // for the site into site/public/data. Run: npm run pipeline [-- --only AAPL,TCS.NS]
-import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import yaml from 'js-yaml';
 import { createYahoo } from '../core/sources/yahoo.js';
 import { createSec, htmlToText, extract10KSections } from '../core/sources/sec.js';
-import { researchTicker, DEFAULT_MARKETS } from '../core/research.js';
+import { researchTicker } from '../core/research.js';
 import { analyze } from '../core/analysis/index.js';
 import { generateNote, noteBasis } from '../core/ai/gemini.js';
 import { sleep } from '../core/util.js';
+import { DATA_DIR as OUT, fileKey, readJson, writeJson, loadConfig, loadThesis as loadThesisFile } from './config.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = path.join(ROOT, 'site', 'public', 'data');
 const log = (...a) => console.log(...a);
-
-export const fileKey = (symbol) => symbol.toUpperCase().replace(/[^A-Z0-9.-]/g, '_');
-
-function readJson(file, fallback = null) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
-}
-function writeJson(file, obj) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(obj));
-}
-
-function loadConfig() {
-  const cfg = yaml.load(fs.readFileSync(path.join(ROOT, 'config.yml'), 'utf8')) || {};
-  cfg.watchlist = (cfg.watchlist || []).map((w) => (typeof w === 'string' ? { symbol: w } : w));
-  cfg.markets = { ...DEFAULT_MARKETS, ...(cfg.markets || {}) };
-  for (const k of Object.keys(DEFAULT_MARKETS)) cfg.markets[k] = { ...DEFAULT_MARKETS[k], ...(cfg.markets[k] || {}) };
-  cfg.ai = { enabled: true, model: 'gemini-3.8-flash', fallbackModel: 'gemini-3.5-flash-lite', refreshDays: 30, googleSearch: true, ...(cfg.ai || {}) };
-  return cfg;
-}
-
-function loadThesis(symbol) {
-  const file = path.join(ROOT, 'theses', `${fileKey(symbol)}.yml`);
-  if (!fs.existsSync(file)) return null;
-  try { return yaml.load(fs.readFileSync(file, 'utf8')); } catch (e) { log(`  ! thesis ${symbol}: ${e.message}`); return null; }
-}
+const loadThesis = (symbol) => loadThesisFile(symbol, log);
 
 // Snapshot of ownership/price per day; builds the promoter/insider trend over time.
 function updateHistory(symbol, data) {

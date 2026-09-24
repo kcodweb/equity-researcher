@@ -13,17 +13,40 @@ A deep-dive equity research workbench for US and Indian stocks. It runs as a sta
 - **AI note:** Gemini writes an analyst-style initiation note. For US companies it also reads the Business, Risk Factors and MD&A sections of the latest 10-K.
 - **Live lookup:** any other ticker can be researched on demand through a free Cloudflare Worker.
 
+## AI analyst (Claude Code)
+
+Open this folder in Claude Code and run:
+
+```
+/research-stock NVDA
+/research-stock "hdfc bank" deep
+```
+
+Claude investigates the stock through the research CLI and writes a report to `research/reports/<SYMBOL>/<date>.md`. It forms its own questions, reads filings, runs its own DCF scenarios and checks the peer set. Every figure is a citation such as `[25.1%](#ref=ratio.FY2026.operatingMargin)`, and `verify` checks every one against the data before the report counts as done. No API key is needed, because this runs on your Claude subscription.
+
+You can also use the CLI directly:
+
+```bash
+npm run research -- snapshot TCS.NS
+npm run research -- dcf AAPL --growth 0.07 --discount 0.095 --terminal 0.025
+npm run research -- filing NVDA --find "customer"
+npm run research -- compare TCS.NS,INFY.NS,HCLTECH.NS
+npm run research -- verify research/reports/NVDA/2026-09-24.md
+```
+
 ## Architecture
 
 ```
-core/        Shared JS engine, used by the pipeline, the browser and the worker
+core/        Shared JS engine, used by the pipeline, the CLI, the browser and the worker
   sources/   Yahoo Finance and SEC EDGAR clients
   analysis/  Ratios, forensics, valuation, risk, thesis
   ai/        Gemini prompt and client
+cli/         Research CLI: the AI analyst's tools (with citation refs and the fact-checker)
 pipeline/    Daily build: researches the watchlist and writes site/public/data/*.json
 site/        React + Vite front end (hash routing, so it works at any Pages path)
 worker/      Cloudflare Worker: a narrow, cached CORS proxy for Yahoo and SEC
 theses/      Your theses, one YAML file per ticker
+research/    AI analyst reports (research/reports/<SYMBOL>/<date>.md)
 config.yml   Watchlist, peer lists, valuation defaults, AI settings
 ```
 

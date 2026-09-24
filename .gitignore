@@ -3,3 +3,4 @@ dist/
 .env
 .wrangler/
 worker/.dev.vars
+.cache/

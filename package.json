@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "pipeline": "node pipeline/build.js",
-    "research": "node pipeline/build.js --only"
+    "research": "node cli/research.js",
+    "refresh": "node pipeline/build.js --only"
   },
   "dependencies": {
     "dompurify": "^3.2.0",
